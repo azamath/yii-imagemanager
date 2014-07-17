@@ -373,19 +373,25 @@ class ImageManager extends CApplicationComponent
         return CActiveRecord::model($this->modelClass)->with($with)->findByAttributes(array('fileId' => $fileId));
     }
 
-    /**
-     * Deletes an image model.
-     * @param integer $id the model id.
-     * @return boolean the result.
-     */
+	/**
+	 * Deletes an image model.
+	 * @param integer $id the model id.
+	 * @throws CException
+	 * @return boolean the result.
+	 */
     public function deleteModel($id)
     {
         if (($model = $this->loadModel($id)) === null) {
             throw new CException(sprintf('Failed to locate image model with id "%d".', $id));
         }
         $fileId = $model->fileId;
-        $result = $model->delete();
-        $this->getFileManager()->deleteModel($fileId);
+		if ($result = $model->delete()) {
+			// delete cached preset images too
+			foreach(glob($this->resolveCachePath(true) . '/*/*' . $model->resolveNormalizedPath()) as $file) {
+				@unlink($file);
+			}
+			$this->getFileManager()->deleteModel($fileId);
+		}
         return $result;
     }
 
