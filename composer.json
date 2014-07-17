@@ -1,11 +1,15 @@
 {
-    "name": "crisu83/yii-imagemanager",
+    "name": "azamath/yii-imagemanager",
     "description": "Image manager for the Yii PHP framework.",
     "license": "BSD-3-Clause",
     "authors": [
         {
             "name": "Christoffer Niska",
             "email": "ChristofferNiska@gmail.com"
+        },
+        {
+            "name": "Azamat Holmeer",
+            "email": "azamat.holmeer@gmail.com"
         }
     ],
     "require": {

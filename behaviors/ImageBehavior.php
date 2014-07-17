@@ -45,9 +45,28 @@ class ImageBehavior extends CActiveRecordBehavior
     public $autoDelete = true;
 
     /**
+     * @var boolean whether to delete the original image automatically after new image uploaded the owner model.
+     */
+    public $autoDeleteOriginal = true;
+
+    /**
      * @var string the application component id for the image manager (defaults to 'imageManager').
      */
     public $managerID = 'imageManager';
+
+	/**
+	 * @var integer Original image id before upload new one
+	 */
+	protected $originalId;
+
+	/**
+	 * @inheritDoc
+	 */
+	public function attach($owner)
+	{
+		parent::attach($owner);
+		$this->originalId = $owner->{$this->idAttribute};
+	}
 
     /**
      * Actions to take before validating the owner of this behavior.
@@ -66,10 +85,19 @@ class ImageBehavior extends CActiveRecordBehavior
      */
     public function beforeSave($event)
     {
-        if ($this->autoSave) {
+        if ($this->autoSave && $this->owner->{$this->uploadAttribute} instanceof CUploadedFile) {
             $this->saveImage($this->owner->{$this->uploadAttribute}, $this->name, $this->path);
         }
     }
+
+	/**
+	 * Actions to take after saving the owner of this behavior.
+	 * @param CModelEvent $event event parameter.
+	 */
+	public function afterSave($event)
+	{
+		if ($this->autoDeleteOriginal) $this->deleteImage();
+	}
 
     /**
      * Actions to take before deleting the owner of this behavior.
@@ -122,24 +150,30 @@ class ImageBehavior extends CActiveRecordBehavior
      * @param string $alt the alternative text display.
      * @param array $htmlOptions additional HTML attributes.
      * @param string $holder the placeholder name.
+	 * @param string|null $idAttribute Attribute name if multiple behavior used. Config value is used by default.
      * @return string the rendered image.
      */
-    public function renderImagePreset($name, $alt = '', $htmlOptions = array(), $holder = null)
+    public function renderImagePreset($name, $alt = '', $htmlOptions = array(), $holder = null, $idAttribute = null)
     {
-        $htmlOptions = array_merge($htmlOptions, $this->createImagePresetOptions($name, $holder));
+		if ($idAttribute === null) $idAttribute = $this->idAttribute;
+        $htmlOptions = array_merge($htmlOptions, $this->createImagePresetOptions($name, $holder, $idAttribute));
         $src = isset($htmlOptions['src']) ? $htmlOptions['src'] : '';
+		if (empty($alt)) $alt = $this->owner->getAttributeLabel($idAttribute);
         return CHtml::image($src, $alt, $htmlOptions);
     }
 
-    /**
-     * Returns the url to the image for the owner of this behavior.
-     * @param string $name the preset name.
-     * @return string the url.
-     */
-    public function createImagePresetUrl($name)
+	/**
+	 * Returns the url to the image for the owner of this behavior.
+	 * @param string $name the preset name.
+	 * @param string|null $idAttribute Attribute name if multiple behavior used. Config value is used by default.
+	 * @throws CException
+	 * @return string the url.
+	 */
+    public function createImagePresetUrl($name, $idAttribute = null)
     {
+		if ($idAttribute === null) $idAttribute = $this->idAttribute;
         $manager = $this->getManager();
-        if (($model = $manager->loadModel($this->owner->{$this->idAttribute}, 'file')) === null) {
+        if (($model = $manager->loadModel($this->owner->{$idAttribute}, 'file')) === null) {
             throw new CException(sprintf(
                 'Failed to locate image model with id "%d".'
             ), $this->owner->{$this->idAttribute});
@@ -147,34 +181,42 @@ class ImageBehavior extends CActiveRecordBehavior
         return $manager->createImagePresetUrl($model, $manager->loadPreset($name));
     }
 
-    /**
-     * Returns the HTML attributes to the image for the owner of this behavior.
-     * @param string $name the preset name.
-     * @param string $holder the placeholder name.
-     * @return string the url.
-     */
-    public function createImagePresetOptions($name, $holder = null)
+	/**
+	 * Returns the HTML attributes to the image for the owner of this behavior.
+	 * @param string $name the preset name.
+	 * @param string $holder the placeholder name.
+	 * @param string|null $idAttribute Attribute name if multiple behavior used. Config value is used by default.
+	 * @return string the url.
+	 */
+    public function createImagePresetOptions($name, $holder = null, $idAttribute = null)
     {
         $manager = $this->getManager();
-        $model = !empty($this->owner->{$this->idAttribute})
-            ? $manager->loadModel($this->owner->{$this->idAttribute}, 'file')
+		if ($idAttribute === null) $idAttribute = $this->idAttribute;
+		$model = !empty($this->owner->{$idAttribute})
+            ? $manager->loadModel($this->owner->{$idAttribute}, 'file')
             : null;
         return $manager->createPresetOptions($name, $model, $holder);
     }
 
     /**
-     * Deletes the image for the owner of this behavior.
+     * Deletes the original image (that was stored before new is uploaded) for the owner of this behavior.
+	 * @param bool $save Whether to save the owner model
      * @throws CException if the image cannot be deleted or if the image id cannot be removed from the owner model.
      */
-    public function deleteImage()
+    public function deleteImage($save = false)
     {
-        if (!$this->getManager()->deleteModel($this->owner->{$this->idAttribute})) {
-            throw new CException('Failed to delete image.');
-        }
-        $this->owner->{$this->idAttribute} = null;
-        if (!$this->owner->save(false)) {
-            throw new CException('Failed to remove image id from owner.');
-        }
+		if ($this->originalId) {
+			if (!$this->getManager()->deleteModel($this->originalId)) {
+				throw new CException('Failed to delete image.');
+			}
+			if ($save) {
+				$this->owner->{$this->idAttribute} = null;
+				if (!$this->owner->save(false)) {
+					throw new CException('Failed to remove image id from owner.');
+				}
+				$this->originalId = null;
+			}
+		}
     }
 
     /**
