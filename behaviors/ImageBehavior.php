@@ -96,7 +96,9 @@ class ImageBehavior extends CActiveRecordBehavior
 	 */
 	public function afterSave($event)
 	{
-		if ($this->autoDeleteOriginal) $this->deleteImage();
+		if ($this->autoDeleteOriginal && $this->owner->{$this->uploadAttribute} instanceof CUploadedFile) {
+			$this->deleteImage();
+		}
 	}
 
     /**
