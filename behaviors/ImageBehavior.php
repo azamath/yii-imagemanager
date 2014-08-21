@@ -146,19 +146,23 @@ class ImageBehavior extends CActiveRecordBehavior
         return $this->getManager()->loadModel($this->owner->{$this->idAttribute}, $with);
     }
 
-    /**
-     * Render the image for the owner of this behavior.
-     * @param string $name the preset name.
-     * @param string $alt the alternative text display.
-     * @param array $htmlOptions additional HTML attributes.
-     * @param string $holder the placeholder name.
+	/**
+	 * Render the image for the owner of this behavior.
 	 * @param string|null $idAttribute Attribute name if multiple behavior used. Config value is used by default.
-     * @return string the rendered image.
-     */
-    public function renderImagePreset($name, $alt = '', $htmlOptions = array(), $holder = null, $idAttribute = null)
+	 * @param string $name the preset name.
+	 * @param string $alt the alternative text display.
+	 * @param array $htmlOptions additional HTML attributes.
+	 * @param string $holder the placeholder name.
+	 * @return string the rendered image.
+	 */
+    public function renderImagePreset($idAttribute, $name, $alt = '', $htmlOptions = array(), $holder = null)
     {
 		if ($idAttribute === null) $idAttribute = $this->idAttribute;
-        $htmlOptions = array_merge($htmlOptions, $this->createImagePresetOptions($name, $holder, $idAttribute));
+        $htmlOptions = array_merge($htmlOptions, $this->createImagePresetOptions($idAttribute, $name, $holder));
+		if (!empty($htmlOptions['autoSize'])) {
+			unset($htmlOptions['width']);
+			unset($htmlOptions['height']);
+		}
         $src = isset($htmlOptions['src']) ? $htmlOptions['src'] : '';
 		if (empty($alt)) $alt = $this->owner->getAttributeLabel($idAttribute);
         return CHtml::image($src, $alt, $htmlOptions);
@@ -166,12 +170,12 @@ class ImageBehavior extends CActiveRecordBehavior
 
 	/**
 	 * Returns the url to the image for the owner of this behavior.
-	 * @param string $name the preset name.
 	 * @param string|null $idAttribute Attribute name if multiple behavior used. Config value is used by default.
+	 * @param string $name the preset name.
 	 * @throws CException
 	 * @return string the url.
 	 */
-    public function createImagePresetUrl($name, $idAttribute = null)
+    public function createImagePresetUrl($idAttribute, $name)
     {
 		if ($idAttribute === null) $idAttribute = $this->idAttribute;
         $manager = $this->getManager();
@@ -185,12 +189,12 @@ class ImageBehavior extends CActiveRecordBehavior
 
 	/**
 	 * Returns the HTML attributes to the image for the owner of this behavior.
+	 * @param string|null $idAttribute Attribute name if multiple behavior used. Config value is used by default.
 	 * @param string $name the preset name.
 	 * @param string $holder the placeholder name.
-	 * @param string|null $idAttribute Attribute name if multiple behavior used. Config value is used by default.
 	 * @return string the url.
 	 */
-    public function createImagePresetOptions($name, $holder = null, $idAttribute = null)
+    public function createImagePresetOptions($idAttribute, $name, $holder = null)
     {
         $manager = $this->getManager();
 		if ($idAttribute === null) $idAttribute = $this->idAttribute;
